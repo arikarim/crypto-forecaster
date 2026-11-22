@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Forecaster">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Crypto Direction Forecaster</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>if(!window.LightweightCharts)document.write('<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"><\/script>');</script>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--text:#e6edf3;--mute:#8b949e;--up:#26a69a;--down:#ef5350;--neu:#d29922;--acc:#58a6ff}
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+  h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
+  select,button{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;cursor:pointer}
+  button:hover,select:hover{border-color:var(--acc)}
+  label{color:var(--mute);display:flex;gap:6px;align-items:center}
+  #live{display:flex;align-items:baseline;gap:8px;margin-left:auto;font-variant-numeric:tabular-nums}
+  #livePrice{font-size:20px;font-weight:700;transition:color .4s}
+  #liveDot{font-size:12px;color:var(--mute);white-space:nowrap}
+  #liveDot.on{color:var(--up)} #liveDot.off{color:var(--down)}
+  .flashUp{color:var(--up)!important} .flashDown{color:var(--down)!important}
+  #status{width:100%;color:var(--mute);font-size:12px;margin-top:-4px}
+  main{padding:14px 16px;max-width:1400px;margin:0 auto}
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .15s;position:relative}
+  .card.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+  .card .tf{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;gap:6px}
+  .card .dir{font-size:22px;font-weight:700;margin:4px 0 2px}
+  .card .sub{font-size:12px;color:var(--mute)}
+  .card .cd{font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums}
+  .card.busy::after{content:"";position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.2}}
+  .Up{color:var(--up)} .Down{color:var(--down)} .Neutral{color:var(--neu)}
+  .weak{opacity:.5}
+  .bar{height:6px;background:#30363d;border-radius:3px;overflow:hidden;margin:8px 0 6px;position:relative}
+  .bar i{position:absolute;inset:0;background:linear-gradient(90deg,var(--down),var(--neu) 50%,var(--up))}
+  .bar b{position:absolute;top:-3px;width:2px;height:12px;background:#fff}
+  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+  #chartWrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:14px}
+  #chart{height:440px}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mute);padding:4px 6px 8px}
+  .legend span::before{content:"";display:inline-block;width:10px;height:3px;margin-right:5px;vertical-align:middle;background:var(--c)}
+  .grid2{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto}
+  .panel h3{margin:0 0 10px;font-size:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+  th{color:var(--mute);font-weight:500}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px}
+  .stats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:3px 0}
+  .stats span:first-child{color:var(--mute)} .stats span:last-child{text-align:right}
+  .err{background:#3d1d1d;border:1px solid var(--down);border-radius:12px;padding:14px;margin-bottom:14px;display:none}
+  .note{color:var(--mute);font-size:12px;margin-top:14px}
+  .good{color:var(--up)} .bad{color:var(--down)}
+  @media(max-width:1000px){.cards{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
+  @media(max-width:640px){
+    header{padding:10px 12px;gap:8px}
+    h1{font-size:15px;flex:1}
+    #live{margin-left:0;order:2;width:100%;justify-content:space-between}
+    #livePrice{font-size:24px}
+    .ctrls{order:3;width:100%;display:flex;gap:8px}
+    .ctrls select,.ctrls button{flex:1;min-width:0}
+    #status{order:4}
+    main{padding:12px}
+    .cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -12px 12px;padding:0 12px 4px;scrollbar-width:none}
+    .cards::-webkit-scrollbar{display:none}
+    .card{flex:0 0 68%;scroll-snap-align:start}
+    #chart{height:330px}
+    .stats{grid-template-columns:1fr}
+    .legend{font-size:11px;gap:8px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 Forecaster</h1>
+  <div id="live"><span id="livePrice">—</span><span id="liveDot">○ connecting</span></div>
+  <div class="ctrls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <select id="sym" aria-label="Coin">
+      <option value="BTCUSDT" selected>BTC</option>
+      <option value="ETHUSDT">ETH</option>
+      <option value="SOLUSDT">SOL</option>
+      <option value="BNBUSDT">BNB</option>
+      <option value="XRPUSDT">XRP</option>
+      <option value="PAXGUSDT">Gold (PAXG)</option>
+    </select>
+    <select id="hor" aria-label="Prediction horizon">
+      <option value="1" selected>Next candle</option>
+      <option value="3">Next 3</option>
+      <option value="6">Next 6</option>
+    </select>
+    <button id="run">↻ Refresh</button>
+  </div>
+  <div id="status">Loading…</div>
+</header>
+<main>
+  <div class="err" id="err"></div>
+  <div class="cards" id="cards"></div>
+  <div id="chartWrap">
+    <div class="legend">
+      <span style="--c:#f0b429">EMA 21</span>
+      <span style="--c:#a371f7">EMA 50</span>
+      <span style="--c:#58a6ff">Expected range (GARCH ±1σ)</span>
+      <span style="--c:#26a69a">▲▼ past signals: green = right</span>
+      <span style="--c:#ef5350">red = wrong</span>
+    </div>
+    <div id="chart"></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h3 id="modelsTitle">Models</h3><table id="models"></table></div>
+    <div class="panel"><h3>Backtest & risk</h3><div class="stats" id="stats"></div></div>
+  </div>
+  <p class="note">
+    <b>Live:</b> prices stream over a WebSocket from the exchange in use. When a candle closes, that timeframe is re-analysed automatically.<br>
+    <b>How it forecasts:</b> each timeframe's last ~1,000 candles become 17 indicators (returns, EMA trend, MACD, RSI, Stochastic, Bollinger position, ATR, volume, slope, efficiency ratio, candle shape).
+    Four models (gradient-boosted trees, logistic regression, k-nearest-neighbour pattern matching, classic technical rules) are scored with a <b>walk-forward backtest</b>: trained only on the past and tested on candles they never saw.
+    The ensemble gives more weight to models that have done better. GARCH(1,1) forecasts the size of the move.
+    "Baseline" means always guessing the more common direction. A model only has an edge if it beats that.
+    Statistical tool, not financial advice.
+  </p>
+</main>
+
+<script id="engine">
+
+/* ================= Indicators ================= */
+function ema(a,n){const k=2/(n+1),o=new Array(a.length);o[0]=a[0];for(let i=1;i<a.length;i++)o[i]=a[i]*k+o[i-1]*(1-k);return o;}
+function sma(a,n){const o=new Array(a.length).fill(NaN);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];if(i>=n-1)o[i]=s/n;}return o;}
+function stdev(a,n){const m=sma(a,n),o=new Array(a.length).fill(NaN);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=(a[j]-m[i])**2;o[i]=Math.sqrt(s/n);}return o;}
+function rsi(c,n=14){const o=new Array(c.length).fill(NaN);let g=0,l=0;
+  for(let i=1;i<c.length;i++){const d=c[i]-c[i-1],up=Math.max(d,0),dn=Math.max(-d,0);
+    if(i<=n){g+=up;l+=dn;if(i===n){g/=n;l/=n;o[i]=l===0?100:100-100/(1+g/l);}}
+    else{g=(g*(n-1)+up)/n;l=(l*(n-1)+dn)/n;o[i]=l===0?100:100-100/(1+g/l);}}
+  return o;}
+function atr(h,l,c,n=14){const o=new Array(c.length).fill(NaN);let a=0;
+  for(let i=0;i<c.length;i++){const tr=i===0?h[i]-l[i]:Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1]));
+    if(i<n){a+=tr;if(i===n-1){a/=n;o[i]=a;}}else{a=(a*(n-1)+tr)/n;o[i]=a;}}
+  return o;}
+
+const FEAT_NAMES=['ret1','ret3','ret6','ret12','ret24','ema9/21','ema21/50','px/ema50','macdHist','rsi','stochK','bbZ','atr%','volZ','slope20','effRatio','body'];
+const WARMUP=60;
+
+function buildFeatures(cs){
+  const c=cs.map(x=>x.c),h=cs.map(x=>x.h),l=cs.map(x=>x.l),o=cs.map(x=>x.o),v=cs.map(x=>Math.log(x.v+1e-9));
+  const e9=ema(c,9),e21=ema(c,21),e50=ema(c,50),m12=ema(c,12),m26=ema(c,26);
+  const macd=c.map((_,i)=>m12[i]-m26[i]),sig=ema(macd,9);
+  const r=rsi(c),a=atr(h,l,c),bm=sma(c,20),bs=stdev(c,20),vm=sma(v,20),vs=stdev(v,20);
+  const N=c.length,X=new Array(N).fill(null);
+  for(let i=WARMUP;i<N;i++){
+    let lo=Infinity,hi=-Infinity;for(let j=i-13;j<=i;j++){if(l[j]<lo)lo=l[j];if(h[j]>hi)hi=h[j];}
+    const n=20;let sx=0,sy=0,sxy=0,sxx=0;for(let j=0;j<n;j++){const y=c[i-n+1+j];sx+=j;sy+=y;sxy+=j*y;sxx+=j*j;}
+    const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx);
+    let path=0;for(let j=i-19;j<=i;j++)path+=Math.abs(c[j]-c[j-1]);
+    const rng=h[i]-l[i];
+    X[i]=[Math.log(c[i]/c[i-1]),Math.log(c[i]/c[i-3]),Math.log(c[i]/c[i-6]),Math.log(c[i]/c[i-12]),Math.log(c[i]/c[i-24]),
+      e9[i]/e21[i]-1,e21[i]/e50[i]-1,c[i]/e50[i]-1,(macd[i]-sig[i])/c[i],(r[i]-50)/50,
+      hi>lo?(c[i]-lo)/(hi-lo):0.5,bs[i]>0?(c[i]-bm[i])/(2*bs[i]):0,a[i]/c[i],vs[i]>0?(v[i]-vm[i])/vs[i]:0,
+      slope/c[i],path>0?(c[i]-c[i-20])/path:0,rng>0?(c[i]-o[i])/rng:0];
+  }
+  return X;
+}
+
+/* ================= Models ================= */
+function scaler(X,idx){const d=X[idx[0]].length,mu=new Array(d).fill(0),sd=new Array(d).fill(0);
+  for(const i of idx)for(let j=0;j<d;j++)mu[j]+=X[i][j];for(let j=0;j<d;j++)mu[j]/=idx.length;
+  for(const i of idx)for(let j=0;j<d;j++)sd[j]+=(X[i][j]-mu[j])**2;for(let j=0;j<d;j++)sd[j]=Math.sqrt(sd[j]/idx.length)||1;
+  return x=>x.map((v,j)=>Math.max(-5,Math.min(5,(v-mu[j])/sd[j])));}
+
+function fitLogit(Z,y,iters=200,lr=0.3,l2=0.02){const d=Z[0].length,n=Z.length,w=new Float64Array(d);let b=0;
+  for(let it=0;it<iters;it++){const gw=new Float64Array(d);let gb=0;
+    for(let i=0;i<n;i++){const zi=Z[i];let z=b;for(let j=0;j<d;j++)z+=w[j]*zi[j];const g=1/(1+Math.exp(-z))-y[i];gb+=g;for(let j=0;j<d;j++)gw[j]+=g*zi[j];}
+    for(let j=0;j<d;j++)w[j]-=lr*(gw[j]/n+l2*w[j]);b-=lr*gb/n;}
+  return z=>{let s=b;for(let j=0;j<d;j++)s+=w[j]*z[j];return 1/(1+Math.exp(-s));};}
+
+function fitGBM(Z,y,{rounds=60,lr=0.08,lambda=2,depth=2,B=16,minHess=5}={}){
+  const n=Z.length,d=Z[0].length,edges=[];
+  for(let j=0;j<d;j++){const col=Z.map(r=>r[j]).sort((a,b)=>a-b),e=[];for(let q=1;q<B;q++)e.push(col[Math.floor(q*n/B)]);edges.push(e);}
+  const binOf=(v,j)=>{const e=edges[j];let lo=0,hi=e.length;while(lo<hi){const m=(lo+hi)>>1;if(v<=e[m])hi=m;else lo=m+1;}return lo;};
+  const Zb=Z.map(r=>r.map((v,j)=>binOf(v,j)));
+  const pm=Math.min(.99,Math.max(.01,y.reduce((a,b)=>a+b,0)/n)),F0=Math.log(pm/(1-pm));
+  const F=new Float64Array(n).fill(F0),trees=[],all=[...Array(n).keys()];
+  const walk=(t,xb)=>{while(t.f!==undefined)t=xb[t.f]<=t.b?t.l:t.r;return t.v;};
+  for(let r=0;r<rounds;r++){
+    const g=new Float64Array(n),hh=new Float64Array(n);
+    for(let i=0;i<n;i++){const p=1/(1+Math.exp(-F[i]));g[i]=p-y[i];hh[i]=Math.max(p*(1-p),1e-6);}
+    const build=(idx,dep)=>{let G=0,H=0;for(const i of idx){G+=g[i];H+=hh[i];}
+      const leaf={v:-G/(H+lambda)};if(dep>=depth)return leaf;
+      const base=G*G/(H+lambda);let best=1e-9,bf=-1,bb=-1;
+      for(let j=0;j<d;j++){const Gh=new Float64Array(B),Hh=new Float64Array(B);
+        for(const i of idx){const b=Zb[i][j];Gh[b]+=g[i];Hh[b]+=hh[i];}
+        let GL=0,HL=0;for(let b=0;b<B-1;b++){GL+=Gh[b];HL+=Hh[b];const GR=G-GL,HR=H-HL;
+          if(HL<minHess||HR<minHess)continue;const gain=GL*GL/(HL+lambda)+GR*GR/(HR+lambda)-base;if(gain>best){best=gain;bf=j;bb=b;}}}
+      if(bf<0)return leaf;const L=[],R=[];for(const i of idx)(Zb[i][bf]<=bb?L:R).push(i);
+      return {f:bf,b:bb,l:build(L,dep+1),r:build(R,dep+1)};};
+    const t=build(all,0);trees.push(t);for(let i=0;i<n;i++)F[i]+=lr*walk(t,Zb[i]);}
+  return z=>{const xb=z.map((v,j)=>binOf(v,j));let f=F0;for(const t of trees)f+=lr*walk(t,xb);return 1/(1+Math.exp(-f));};}
+
+function fitKNN(Z,y,k=30){return z=>{const ds=new Array(Z.length);
+  for(let i=0;i<Z.length;i++){const r=Z[i];let s=0;for(let j=0;j<r.length;j++){const t=r[j]-z[j];s+=t*t;}ds[i]=[s,y[i]];}
+  ds.sort((a,b)=>a[0]-b[0]);let u=0;const kk=Math.min(k,ds.length);for(let i=0;i<kk;i++)u+=ds[i][1];return (u+1)/(kk+2);};}
+
+/* classic TA consensus: trend (EMA, MACD, price vs EMA50) + mean reversion (RSI, Bollinger) */
+function taRule(x){const sg=v=>v>0?1:v<0?-1:0;
+  let s=0.3*sg(x[5])+0.2*sg(x[8])+0.2*sg(x[7]);
+  if(x[9]>0.4)s-=0.15;if(x[9]<-0.4)s+=0.15;if(x[11]>1)s-=0.15;if(x[11]<-1)s+=0.15;
+  return 0.5+0.2*s;}
+
+const MODELS=[
+  {id:'gbm',name:'Gradient-boosted trees',fit:(Z,y)=>fitGBM(Z,y),raw:false},
+  {id:'logit',name:'Logistic regression',fit:(Z,y)=>fitLogit(Z,y),raw:false},
+  {id:'knn',name:'Pattern match (k-NN)',fit:(Z,y)=>fitKNN(Z,y),raw:false},
+  {id:'ta',name:'Technical rules (EMA/MACD/RSI/BB)',fit:()=>taRule,raw:true},
+];
+
+function fitAll(X,trIdx,yOf){const sc=scaler(X,trIdx),Z=trIdx.map(i=>sc(X[i])),y=trIdx.map(yOf),out={};
+  for(const m of MODELS){const f=m.fit(Z,y);out[m.id]=m.raw?(i=>f(X[i])):(i=>f(sc(X[i])));}
+  return out;}
+
+/* ================= GARCH(1,1) ================= */
+function garch(rets){const n=rets.length,mu=rets.reduce((a,b)=>a+b,0)/n,e=rets.map(r=>r-mu),V=e.reduce((a,b)=>a+b*b,0)/n;
+  let best={ll:-Infinity,a:.05,b:.9};
+  for(let a=0.02;a<=0.2001;a+=0.02)for(let b=0.70;b<=0.9801;b+=0.02){if(a+b>=0.995)continue;
+    const w=V*(1-a-b);let h=V,ll=0;for(let t=0;t<n;t++){ll+=-0.5*(Math.log(h)+e[t]*e[t]/h);h=w+a*e[t]*e[t]+b*h;}
+    if(ll>best.ll)best={ll,a,b};}
+  const {a,b}=best,w=V*(1-a-b);let h=V;for(let t=0;t<n;t++)h=w+a*e[t]*e[t]+b*h; // h = next-period variance
+  return {a,b,V,h,sigma1:Math.sqrt(h),longRun:Math.sqrt(V)};}
+function garchCum(g,k){let s=0;for(let j=1;j<=k;j++)s+=g.V+Math.pow(g.a+g.b,j-1)*(g.h-g.V);return Math.sqrt(Math.max(s,0));}
+
+/* ================= Walk-forward analysis ================= */
+const TH=0.03, FEE=0.002, TRAIN_MAX=600, BLK=50;
+
+function analyze(candles,H,nowMs){
+  const closed=candles[candles.length-1].ct>nowMs?candles.slice(0,-1):candles.slice();
+  const X=buildFeatures(closed),c=closed.map(k=>k.c),N=closed.length;
+  const yOf=i=>c[i+H]>c[i]?1:0;
+  const rows=[];for(let i=WARMUP;i<N-H;i++)rows.push(i);
+  const start=Math.max(Math.min(200,Math.floor(rows.length*0.5)),Math.floor(rows.length*0.45));
+  const preds={};MODELS.forEach(m=>preds[m.id]=[]);const ens=[],oos=[];
+  const accOf=(arr,idx)=>{if(!idx.length)return .5;let k=0;idx.forEach((i,j)=>{if((arr[j]>=.5?1:0)===yOf(i))k++;});return k/idx.length;};
+  const weights=()=>{const w={};if(oos.length<60){MODELS.forEach(m=>w[m.id]=1);return w;}
+    const s=Math.max(0,oos.length-300),idx=oos.slice(s);
+    MODELS.forEach(m=>w[m.id]=Math.max(0.02,accOf(preds[m.id].slice(s),idx)-0.49));return w;};
+  const combine=(ps,w)=>{let a=0,b=0;for(const m of MODELS){a+=w[m.id]*ps[m.id];b+=w[m.id];}return a/b;};
+  for(let s=start;s<rows.length;s+=BLK){
+    const trEnd=s-H,tr=rows.slice(Math.max(0,trEnd-TRAIN_MAX),trEnd),te=rows.slice(s,Math.min(rows.length,s+BLK));
+    const f=fitAll(X,tr,yOf),w=weights();
+    for(const i of te){const ps={};for(const m of MODELS){ps[m.id]=f[m.id](i);preds[m.id].push(ps[m.id]);}ens.push(combine(ps,w));oos.push(i);}
+  }
+  // metrics
+  const ups=oos.reduce((a,i)=>a+yOf(i),0),upRate=ups/oos.length;
+  const modelAcc={};MODELS.forEach(m=>modelAcc[m.id]=accOf(preds[m.id],oos));
+  const ensAcc=accOf(ens,oos);
+  let sigN=0,sigK=0;oos.forEach((i,j)=>{const d=ens[j]-.5;if(Math.abs(d)>=TH){sigN++;if((d>0?1:0)===yOf(i))sigK++;}});
+  let eq=1,trades=0;for(let j=0;j<oos.length;j+=H){const i=oos[j],d=ens[j]-.5;const pos=d>=TH?1:d<=-TH?-1:0;
+    if(pos){eq*=1+pos*(c[i+H]/c[i]-1)-FEE;trades++;}}
+  const hold=c[oos[oos.length-1]+H]/c[oos[0]]-1;
+  // live prediction
+  const trLive=rows.slice(Math.max(0,rows.length-TRAIN_MAX)),fl=fitAll(X,trLive,yOf),wl=weights(),last=N-1,ps={};
+  MODELS.forEach(m=>ps[m.id]=fl[m.id](last));const p=combine(ps,wl);
+  // volatility & regime
+  const rets=[];for(let i=1;i<N;i++)rets.push(Math.log(c[i]/c[i-1]));const g=garch(rets.slice(-1000));
+  const er=Math.abs(X[last][15]),trendUp=X[last][6]>0;
+  const regime=er>0.35?(trendUp?'Trending up':'Trending down'):er<0.2?'Choppy / ranging':'Mixed';
+  const signals=oos.map((i,j)=>({t:closed[i].t,p:ens[j],ok:((ens[j]>=.5?1:0)===yOf(i))})).filter(s=>Math.abs(s.p-.5)>=TH).slice(-80);
+  return {lastT:closed[last].t,price:c[last],p,ps,weights:wl,modelAcc,ensAcc,upRate,baseline:Math.max(upRate,1-upRate),
+    n:oos.length,sigN,sigAcc:sigN?sigK/sigN:NaN,strat:eq-1,hold,trades,garch:g,regime,signals};
+}
+
+</script>
+
+<script>
+const TFS=[{k:'5m',s:300},{k:'15m',s:900},{k:'1h',s:3600},{k:'4h',s:14400},{k:'1d',s:86400}];
+const $=id=>document.getElementById(id);
+let results={},candlesBy={},selTf='1h',busy=false,gen=0,agen=0,fitView=true;
+const TFSEC={'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+let lastSource='';
+async function getJSON(url,ms=9000){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),ms);
+  try{const r=await fetch(url,{signal:ac.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
+  catch(e){throw new Error(e.name==='AbortError'?'timeout':(e.message||String(e)));}finally{clearTimeout(t);}}
+const withCt=(arr,tf)=>arr.sort((a,b)=>a.t-b.t).map(k=>({...k,ct:k.t+TFSEC[tf]*1000-1}));
+
+const SOURCES=[
+  {name:'Binance',fetch:async(sym,tf)=>{let err;
+    for(const h of ['https://data-api.binance.vision','https://api.binance.com']){
+      try{const j=await getJSON(`${h}/api/v3/klines?symbol=${sym}&interval=${tf}&limit=1000`);
+        return j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5],ct:k[6]}));}catch(e){err=e;}}
+    throw err;}},
+  {name:'Bybit',fetch:async(sym,tf)=>{const iv={'5m':'5','15m':'15','1h':'60','4h':'240','1d':'D'}[tf];
+    const j=await getJSON(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${sym}&interval=${iv}&limit=1000`);
+    if(j.retCode!==0||!j.result||!j.result.list||!j.result.list.length)throw new Error(j.retMsg||'no data');
+    return withCt(j.result.list.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]})),tf);}},
+  {name:'OKX',fetch:async(sym,tf)=>{const bar={'5m':'5m','15m':'15m','1h':'1H','4h':'4H','1d':'1Dutc'}[tf];
+    const inst=sym.replace(/USDT$/,'-USDT');let out=[],after='';
+    for(let pg=0;pg<4;pg++){const j=await getJSON(`https://www.okx.com/api/v5/market/candles?instId=${inst}&bar=${bar}&limit=300${after?'&after='+after:''}`);
+      if(j.code!=='0')throw new Error(j.msg||'error');if(!j.data.length)break;
+      out=out.concat(j.data.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]})));after=j.data[j.data.length-1][0];}
+    if(!out.length)throw new Error('no data');return withCt(out,tf);}},
+  {name:'Coinbase',fetch:async(sym,tf)=>{const prod=sym.replace(/USDT$/,'-USD');
+    const base=tf==='4h'?3600:TFSEC[tf];let out=[],end=Math.floor(Date.now()/1000);
+    for(let pg=0;pg<4;pg++){const st=end-300*base;
+      const j=await getJSON(`https://api.exchange.coinbase.com/products/${prod}/candles?granularity=${base}&start=${new Date(st*1000).toISOString()}&end=${new Date(end*1000).toISOString()}`);
+      if(!Array.isArray(j))throw new Error(j.message||'error');if(!j.length)break;
+      out=out.concat(j.map(k=>({t:k[0]*1000,o:+k[3],h:+k[2],l:+k[1],c:+k[4],v:+k[5]})));end=st;}
+    if(!out.length)throw new Error('no data');
+    const seen=new Set();out=out.filter(k=>!seen.has(k.t)&&seen.add(k.t)).sort((a,b)=>a.t-b.t);
+    if(tf==='4h'){const g=new Map();for(const k of out){const b=Math.floor(k.t/14400000)*14400000,x=g.get(b);
+        if(!x)g.set(b,{t:b,o:k.o,h:k.h,l:k.l,c:k.c,v:k.v});else{x.h=Math.max(x.h,k.h);x.l=Math.min(x.l,k.l);x.c=k.c;x.v+=k.v;}}
+      out=[...g.values()];}
+    return withCt(out,tf);}},
+];
+let preferred=0;
+async function fetchKlines(sym,tf){const errs=[];
+  const order=[...SOURCES.keys()];order.unshift(...order.splice(preferred,1));
+  for(const i of order){const src=SOURCES[i];
+    try{const d=await src.fetch(sym,tf);if(d.length<150)throw new Error('only '+d.length+' candles');
+      preferred=i;lastSource=src.name;return d;}catch(e){errs.push(src.name+': '+e.message);}}
+  throw new Error(errs.join(' · '));}
+
+
+const fmtP=v=>v>=1000?v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):v>=1?v.toFixed(4):v.toPrecision(5);
+const pct=(v,d=1)=>(v*100).toFixed(d)+'%';
+const sgnPct=v=>(v>=0?'+':'')+(v*100).toFixed(1)+'%';
+
+/* ---------- analysis in a Web Worker (keeps the page smooth on phones) ---------- */
+let worker=null,wid=0;const pending=new Map();
+try{
+  const code=document.getElementById('engine').textContent+
+    `\nself.onmessage=e=>{const{id,candles,H,now}=e.data;try{postMessage({id,r:analyze(candles,H,now)});}catch(err){postMessage({id,error:String(err&&err.message||err)});}};`;
+  worker=new Worker(URL.createObjectURL(new Blob([code],{type:'text/javascript'})));
+  worker.onmessage=e=>{const p=pending.get(e.data.id);if(!p)return;pending.delete(e.data.id);e.data.error?p.rej(new Error(e.data.error)):p.res(e.data.r);};
+  worker.onerror=()=>{worker=null;for(const p of pending.values())p.rej(new Error('worker'));pending.clear();};
+}catch(e){worker=null;}
+function analyzeAsync(candles,H){
+  if(!worker)return new Promise((res,rej)=>setTimeout(()=>{try{res(analyze(candles,H,Date.now()));}catch(e){rej(e);}},0));
+  return new Promise((res,rej)=>{const id=++wid;pending.set(id,{res,rej});worker.postMessage({id,candles,H,now:Date.now()});})
+    .catch(()=>analyze(candles,H,Date.now()));
+}
+
+function verdict(r){const d=r.p-.5,edge=r.ensAcc-r.baseline;
+  const dir=Math.abs(d)<TH?'Neutral':d>0?'Up':'Down';
+  let conf=Math.abs(d)>=0.10?'High':Math.abs(d)>=0.06?'Medium':'Low';
+  if(edge<=0||r.ensAcc<0.52)conf='No proven edge';
+  return {dir,conf,edge};}
+
+const analyzing=new Set();
+function renderCards(){const H=+$('hor').value;
+  $('cards').innerHTML=TFS.map(tf=>{const r=results[tf.k],b=analyzing.has(tf.k)?' busy':'',sel=tf.k===selTf?' sel':'';
+    if(!r)return `<div class="card${sel}${b}" data-tf="${tf.k}"><div class="tf"><span>${tf.k}</span></div><div class="dir" style="color:var(--mute)">…</div><div class="sub">analysing</div></div>`;
+    if(r.error)return `<div class="card${sel}" data-tf="${tf.k}"><div class="tf"><span>${tf.k}</span></div><div class="dir bad">Error</div><div class="sub">${r.error}</div></div>`;
+    const v=verdict(r),s=garchCum(r.garch,H),arrow=v.dir==='Up'?'▲':v.dir==='Down'?'▼':'◆';
+    return `<div class="card${sel}${b}" data-tf="${tf.k}">
+      <div class="tf"><span>${tf.k} · next ${H}</span><span class="tag">${v.conf}</span></div>
+      <div class="dir ${v.dir}${v.conf==='No proven edge'?' weak':''}">${arrow} ${v.dir}</div>
+      <div class="bar"><i></i><b style="left:calc(${Math.max(0,Math.min(100,r.p*100))}% - 1px)"></b></div>
+      <div class="sub">P(up) <b style="color:var(--text)">${pct(r.p)}</b> · range ±${pct(s,2)}</div>
+      <div class="sub">Backtest ${pct(r.ensAcc)} vs ${pct(r.baseline)} <span class="${v.edge>0?'good':'bad'}">(${v.edge>=0?'+':''}${(v.edge*100).toFixed(1)})</span></div>
+      <div class="cd" data-cd="${tf.k}"></div>
+    </div>`;}).join('');
+  document.querySelectorAll('.card').forEach(el=>el.onclick=()=>{if(selTf!==el.dataset.tf){selTf=el.dataset.tf;fitView=true;}renderCards();renderDetail();});
+  tickCountdown();}
+
+function tickCountdown(){const now=Date.now();
+  document.querySelectorAll('[data-cd]').forEach(el=>{const tf=el.dataset.cd,cs=candlesBy[tf];if(!cs)return;
+    const sec=TFS.find(t=>t.k===tf).s,last=cs[cs.length-1],end=last.t+sec*1000,left=Math.max(0,Math.round((end-now)/1000));
+    const h=Math.floor(left/3600),m=Math.floor(left%3600/60),s=left%60;
+    el.textContent='Candle closes in '+(h?h+'h ':'')+String(m).padStart(h?2:1,'0')+':'+String(s).padStart(2,'0');});}
+setInterval(tickCountdown,1000);
+
+/* ---------- chart ---------- */
+let chart=null,cSeries,e21S,e50S,upS,loS;
+function initChart(){
+  chart=LightweightCharts.createChart($('chart'),{autoSize:true,layout:{background:{color:'#161b22'},textColor:'#8b949e'},
+    grid:{vertLines:{color:'#21262d'},horzLines:{color:'#21262d'}},timeScale:{timeVisible:true,secondsVisible:false,rightOffset:8},
+    rightPriceScale:{borderColor:'#30363d'},crosshair:{mode:0}});
+  cSeries=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderVisible:false,wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+  e21S=chart.addLineSeries({color:'#f0b429',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+  e50S=chart.addLineSeries({color:'#a371f7',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+  upS=chart.addLineSeries({color:'#58a6ff',lineWidth:2,lineStyle:2,priceLineVisible:false,lastValueVisible:true});
+  loS=chart.addLineSeries({color:'#58a6ff',lineWidth:2,lineStyle:2,priceLineVisible:false,lastValueVisible:true});
+}
+const tz=new Date().getTimezoneOffset()*60;
+const T=ms=>Math.floor(ms/1000)-tz;
+const bar=k=>({time:T(k.t),open:k.o,high:k.h,low:k.l,close:k.c});
+
+function renderDetail(){const r=results[selTf],cs=candlesBy[selTf];if(!r||r.error||!cs)return;
+  const H=+$('hor').value,tfSec=TFS.find(t=>t.k===selTf).s,v=verdict(r),s=garchCum(r.garch,H);
+  if(chart){
+    cSeries.setData(cs.map(bar));
+    const cl=cs.map(k=>k.c),a21=ema(cl,21),a50=ema(cl,50);
+    e21S.setData(cs.map((k,i)=>({time:T(k.t),value:a21[i]})));e50S.setData(cs.map((k,i)=>({time:T(k.t),value:a50[i]})));
+    const t0=T(r.lastT),up=[],lo=[];
+    for(let k=0;k<=H;k++){const g=garchCum(r.garch,k);up.push({time:t0+k*tfSec,value:r.price*Math.exp(g)});lo.push({time:t0+k*tfSec,value:r.price*Math.exp(-g)});}
+    upS.setData(up);loS.setData(lo);
+    const tset=new Set(cs.map(k=>k.t));
+    cSeries.setMarkers(r.signals.filter(x=>tset.has(x.t)).slice(innerWidth<640?-25:-50).map(x=>({time:T(x.t),position:x.p>.5?'belowBar':'aboveBar',shape:x.p>.5?'arrowUp':'arrowDown',color:x.ok?'#26a69a':'#ef5350'})));
+    if(fitView){chart.timeScale().setVisibleLogicalRange({from:cs.length-(innerWidth<640?80:160),to:cs.length+6});fitView=false;}
+  }
+  $('modelsTitle').textContent=`Models · ${$('sym').value} ${selTf} · next ${H} candle${H>1?'s':''}`;
+  const wsum=MODELS.reduce((a,m)=>a+r.weights[m.id],0);
+  $('models').innerHTML=`<tr><th>Model</th><th class="num">Backtest</th><th class="num">Weight</th><th class="num">P(up)</th></tr>`+
+    MODELS.map(m=>{const acc=r.modelAcc[m.id];
+      return `<tr><td>${m.name}</td><td class="num ${acc>r.baseline?'good':'bad'}">${pct(acc)}</td><td class="num">${pct(r.weights[m.id]/wsum,0)}</td><td class="num">${pct(r.ps[m.id])}</td></tr>`;}).join('')+
+    `<tr><td><b>Ensemble</b></td><td class="num ${r.ensAcc>r.baseline?'good':'bad'}"><b>${pct(r.ensAcc)}</b></td><td class="num">—</td><td class="num"><b class="${v.dir}">${pct(r.p)}</b></td></tr>`;
+  $('stats').innerHTML=[
+    ['Last closed price',fmtP(r.price)],
+    ['Direction',`<span class="${v.dir}">${v.dir}</span> (${v.conf})`],
+    ['Expected range',`${fmtP(r.price*Math.exp(-s))} – ${fmtP(r.price*Math.exp(s))}`],
+    ['Volatility / candle',`${pct(r.garch.sigma1,2)} (avg ${pct(r.garch.longRun,2)})`],
+    ['Market regime',r.regime],
+    ['Out-of-sample tests',r.n],
+    ['Baseline (always '+(r.upRate>=.5?'up':'down')+')',pct(r.baseline)],
+    ['Ensemble accuracy',`<span class="${v.edge>0?'good':'bad'}">${pct(r.ensAcc)}</span>`],
+    ['When it gave a signal',isNaN(r.sigAcc)?'—':`${pct(r.sigAcc)} of ${r.sigN}`],
+    ['Signal strategy (0.2% fees)',`<span class="${r.strat>r.hold?'good':'bad'}">${sgnPct(r.strat)}</span> · ${r.trades} trades`],
+    ['Buy & hold, same period',sgnPct(r.hold)],
+    ['Data source',lastSource||'—'],
+  ].map(([a,b])=>`<div><span>${a}</span><span>${b}</span></div>`).join('');
+}
+
+/* ---------- analysis scheduling ---------- */
+const queued=new Set();
+async function reanalyze(tf){
+  if(analyzing.has(tf)){queued.add(tf);return;}
+  const cs=candlesBy[tf];if(!cs)return;const myGen=agen;
+  analyzing.add(tf);renderCards();
+  try{const r=await analyzeAsync(cs.slice(),+$('hor').value);if(myGen!==agen)return;results[tf]=r;}
+  catch(e){if(myGen===agen)results[tf]={error:'Analysis failed'};}
+  finally{analyzing.delete(tf);}
+  if(myGen!==agen){renderCards();return;}
+  renderCards();if(tf===selTf)renderDetail();
+  if(queued.delete(tf))reanalyze(tf);
+}
+
+/* ---------- live streaming ---------- */
+let ws=null,pingT=null,retry=0,retryT=null,lastPx=null;
+function setLive(state,txt){const d=$('liveDot');d.className=state;d.textContent=txt;}
+function showPrice(p){const el=$('livePrice');el.textContent=fmtP(p);
+  if(lastPx!==null&&p!==lastPx){el.classList.remove('flashUp','flashDown');void el.offsetWidth;el.classList.add(p>lastPx?'flashUp':'flashDown');
+    clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('flashUp','flashDown'),600);}
+  lastPx=p;document.title=fmtP(p)+' · '+$('sym').value.replace('USDT','')+' Forecaster';}
+
+function onTick(tf,k){const cs=candlesBy[tf];if(!cs||!cs.length)return;const sec=TFS.find(t=>t.k===tf).s,last=cs[cs.length-1];
+  if(k.t===last.t){last.o=k.o;last.h=k.h;last.l=k.l;last.c=k.c;last.v=k.v;}
+  else if(k.t>last.t){cs.push({t:k.t,o:k.o,h:k.h,l:k.l,c:k.c,v:k.v,ct:k.t+sec*1000-1});if(cs.length>1000)cs.shift();
+    reanalyze(tf);if(tf===selTf&&chart)cSeries.setData(cs.map(bar));}
+  else return;
+  if(tf===selTf&&chart)cSeries.update(bar(cs[cs.length-1]));
+  if(tf==='5m')showPrice(k.c);}
+
+function onPrice(p){const now=Date.now();showPrice(p);
+  for(const tf of TFS){const cs=candlesBy[tf.k];if(!cs||!cs.length)continue;const ms=tf.s*1000,b=Math.floor(now/ms)*ms,last=cs[cs.length-1];
+    if(b>last.t)onTick(tf.k,{t:b,o:p,h:p,l:p,c:p,v:0});
+    else onTick(tf.k,{t:last.t,o:last.o,h:Math.max(last.h,p),l:Math.min(last.l,p),c:p,v:last.v});}}
+
+const STREAMS={
+  Binance:sym=>({url:`wss://data-stream.binance.vision/stream?streams=${TFS.map(t=>sym.toLowerCase()+'@kline_'+t.k).join('/')}`,
+    onopen:()=>{},ping:null,
+    onmsg:m=>{const k=m.data&&m.data.k;if(k)onTick(k.i,{t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v});}}),
+  Bybit:sym=>{const iv={'5m':'5','15m':'15','1h':'60','4h':'240','1d':'D'},rev=Object.fromEntries(Object.entries(iv).map(([a,b])=>[b,a]));
+    return {url:'wss://stream.bybit.com/v5/public/spot',
+      onopen:w=>w.send(JSON.stringify({op:'subscribe',args:[...TFS.map(t=>`kline.${iv[t.k]}.${sym}`),`tickers.${sym}`]})),
+      ping:w=>w.send(JSON.stringify({op:'ping'})),
+      onmsg:m=>{if(!m.topic)return;
+        if(m.topic.startsWith('kline.')){const tf=rev[m.topic.split('.')[1]];for(const d of m.data||[])onTick(tf,{t:+d.start,o:+d.open,h:+d.high,l:+d.low,c:+d.close,v:+d.volume});}
+        else if(m.topic.startsWith('tickers.')&&m.data&&m.data.lastPrice)showPrice(+m.data.lastPrice);}};},
+  OKX:sym=>{const ch={'5m':'candle5m','15m':'candle15m','1h':'candle1H','4h':'candle4H','1d':'candle1Dutc'},rev=Object.fromEntries(Object.entries(ch).map(([a,b])=>[b,a]));
+    const inst=sym.replace(/USDT$/,'-USDT');
+    return {url:'wss://ws.okx.com:8443/ws/v5/business',
+      onopen:w=>w.send(JSON.stringify({op:'subscribe',args:TFS.map(t=>({channel:ch[t.k],instId:inst}))})),
+      ping:w=>w.send('ping'),
+      onmsg:m=>{const tf=m.arg&&rev[m.arg.channel];if(!tf||!m.data)return;for(const d of m.data)onTick(tf,{t:+d[0],o:+d[1],h:+d[2],l:+d[3],c:+d[4],v:+d[5]});}};},
+  Coinbase:sym=>({url:'wss://ws-feed.exchange.coinbase.com',
+    onopen:w=>w.send(JSON.stringify({type:'subscribe',product_ids:[sym.replace(/USDT$/,'-USD')],channels:['ticker']})),
+    ping:null,onmsg:m=>{if(m.type==='ticker'&&m.price)onPrice(+m.price);}}),
+};
+
+function stopStream(){clearInterval(pingT);clearTimeout(retryT);if(ws){ws.onclose=null;ws.onerror=null;try{ws.close();}catch(e){}ws=null;}}
+function startStream(){stopStream();const sym=$('sym').value,name=lastSource,mk=STREAMS[name];if(!mk)return;
+  const cfg=mk(sym),myGen=gen;setLive('', '○ connecting');
+  try{ws=new WebSocket(cfg.url);}catch(e){scheduleRetry(myGen);return;}
+  ws.onopen=()=>{retry=0;cfg.onopen(ws);setLive('on','● LIVE · '+name);if(cfg.ping)pingT=setInterval(()=>{try{cfg.ping(ws);}catch(e){}},20000);};
+  ws.onmessage=e=>{if(e.data==='pong')return;let m;try{m=JSON.parse(e.data);}catch(_){return;}cfg.onmsg(m);};
+  ws.onerror=()=>{};
+  ws.onclose=()=>{clearInterval(pingT);if(myGen===gen)scheduleRetry(myGen);};}
+function scheduleRetry(myGen){setLive('off','● reconnecting…');retry++;
+  retryT=setTimeout(()=>{if(myGen!==gen)return;
+    if(retry>4)run(); else startStream();},Math.min(30000,1000*2**retry));}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(!ws||ws.readyState>1))run();});
+
+/* ---------- full refresh ---------- */
+async function run(){const myGen=++gen;agen++;stopStream();retry=0;busy=true;$('err').style.display='none';
+  const sym=$('sym').value;results={};candlesBy={};analyzing.clear();queued.clear();fitView=true;renderCards();
+  let fails=0,lastErr='';
+  const fetched=await Promise.all(TFS.map(async tf=>{
+    try{const cs=await fetchKlines(sym,tf.k);return [tf.k,cs];}catch(e){fails++;lastErr=e.message||String(e);return [tf.k,null];}}));
+  if(myGen!==gen)return;
+  for(const [k,cs] of fetched){if(cs)candlesBy[k]=cs;else results[k]={error:'Fetch failed'};}
+  const last5=candlesBy['5m']||candlesBy['15m']||candlesBy['1h'];if(last5)showPrice(last5[last5.length-1].c);
+  if(fails===TFS.length){$('err').style.display='block';setLive('off','● offline');
+    $('err').innerHTML=`<b>Couldn't reach any exchange.</b><br><small>${lastErr}</small><br><br>Check your internet connection. If you're on a network that blocks crypto exchanges, try a VPN.`;
+    $('status').textContent='Offline';busy=false;renderCards();return;}
+  $('status').textContent=`Data: ${lastSource} · analysing…`;
+  startStream();
+  const order=[selTf,...TFS.map(t=>t.k).filter(k=>k!==selTf)];
+  for(const k of order){if(myGen!==gen)return;if(candlesBy[k])await reanalyze(k);}
+  if(myGen!==gen)return;
+  $('status').textContent=`Data: ${lastSource} · analysed ${new Date().toLocaleTimeString()} · re-analyses automatically on each candle close`;
+  busy=false;}
+
+try{initChart();}catch(e){$('chart').innerHTML='<p style="padding:20px;color:#8b949e">Chart unavailable: '+e.message+'</p>';chart=null;}
+renderCards();
+$('run').onclick=run;$('sym').onchange=()=>{lastPx=null;run();};$('hor').onchange=()=>{const g=++agen;results={};analyzing.clear();queued.clear();renderCards();
+  (async()=>{for(const k of [selTf,...TFS.map(t=>t.k).filter(k=>k!==selTf)]){if(g!==agen)return;await reanalyze(k);}})();};
+run();
+</script>
+</body>
+</html>
